@@ -1,0 +1,25 @@
+// need to fix/upgrade
+1. Chuyển sang dùng doc/docx, chỉ upload bằng docx/doc.
+2. render lại doc/docx khi  upload lên(giống 100% file khi upload lên)
+3. phần ngày/tháng/năm ở các form chỉ được điền số(ngày ... tháng... năm .....)
+4. người dùng điền được biểu mẫu trên web(điền trên "............;"), khi xuất về, in, chuyển hết về pdf
+5. người dùng điền thông tin, khi quá dài, sẽ tự xuống dòng, chữ đầu dòng, sau chấm, sẽ tự dộng viết hoa, người dùng có thể tự chỉnh bằng cách xoá và điền lại lần 2
+6. khi người dùng có thông tin cơ bản như họ và tên(Fullname), có sđt, address, Dob, sẽ có 1 frame bên cạnh hỏi người dùng có muốn autofill cho thông tin người dùng vào biểu mẫu hay không( người dùng tự lựa chọn) những thông tin như họ và tên, dob, sdt ,address,.. .
+7. cập nhật lại SQl cho phù hợp với các yêu cầu cần sửa
+8. bỏ hết phần xuất nhập pdf, chỉ sử dụng tới pdf cho phần tải về, in
+9. có thêm phần tìm kiếm biểu mẫu( tương tự như thanh tìm kiếm bên trang chính, tìm kiếm theo categories) trong personal forms( phần forms người dùng tương tác sẽ được sắp xếp theo người dùng tương tác mới nhất, có phân theo trang 1,2,3,...,).
+10. lưu phần thông tin của người dùng vào db(lỗi chưa sửa: không lưu hoàn toàn chỉ lưu tạm bợ 1 lần, làn đăng nhập tiếp theo thì dữ liệu mất hết)
+11. convert pdf qua doc/docx khi uploads lên
+12. để admin tự chỉnh sửa, có preview realtime
+
+
+
+DONE: 
+convert PDF ->DOC/DOCX ✅
+điền số dd/mm/yyyy ✅
+lưu hoàn chỉnh thông tin người dùng✅
+sửa/in/xuất/nhập form hoàn chỉnh ✅
+có auto fill(v.v)✅
+chuyển hết tất cả về pdf khi user muốn in/xuất forms ✅
+điền được biểu mẫu cả pdf/doc/docx ✅
+render pdf/doc/docx không bị lỗi người dùng điền được✅

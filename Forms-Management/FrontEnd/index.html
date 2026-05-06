@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Forms management</title>
+    <style>
+      * { box-sizing: border-box; }
+
+      @media print {
+        @page {
+          size: A4;
+          margin: 15mm 20mm 15mm 20mm;
+        }
+
+        /* ✅ Ẩn tất cả */
+        body {
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
+        body * {
+          visibility: hidden !important;
+        }
+
+        /* ✅ Hiện word-document — KHÔNG dùng position fixed */
+        .word-document {
+          visibility: visible !important;
+          position: static !important; 
+          display: block !important;
+          width: 100% !important;
+          height: auto !important;
+          min-height: unset !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          border: none !important;
+          box-shadow: none !important;
+          border-radius: 0 !important;
+          background: #fff !important;
+          font-size: 13pt !important;
+          font-family: 'Times New Roman', serif !important;
+          overflow: visible !important;
+          color: #000 !important;
+          line-height: 1.8 !important;
+        }
+
+        .word-document * {
+          visibility: visible !important;
+        }
+
+        /* ✅ Ẩn no-print */
+        .no-print,
+        .no-print * {
+          display: none !important;
+          visibility: hidden !important;
+        }
+
+        /* ✅ Ẩn nav/header */
+        nav, header, footer {
+          display: none !important;
+          visibility: hidden !important;
+        }
+
+        /* ✅ Bảng khi in */
+        .word-document table {
+          width: 100% !important;
+          border-collapse: collapse !important;
+          table-layout: fixed !important;
+        }
+
+        .word-document td,
+        .word-document th {
+          padding: 2px 4px !important;
+          vertical-align: top !important;
+          word-wrap: break-word !important;
+          overflow-wrap: break-word !important;
+        }
+
+        /* ✅ Input/textarea khi in */
+        .word-document input[type="text"],
+        .word-document textarea {
+          border: none !important;
+          border-bottom: 1px dotted #000 !important;
+          background: transparent !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
