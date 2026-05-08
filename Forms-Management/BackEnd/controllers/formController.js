@@ -693,21 +693,36 @@ function insertFields(formId, fields, connection, callback) {
 }
 
 function saveFormToDB(formData, fields, res) {
-  const { title, description, category_id, template_html, created_by } = formData;
+  const { title, description, category_id, template_html, created_by, uploadedFilename } = formData;
   db.transaction((err, connection) => {
     if (err) return res.status(500).json({ error: "Lỗi transaction: " + err.message });
+ 
+    // Lưu tên file gốc (do multer tạo ra) vào cột template_docx
+    // để sau này khi xóa form có thể tìm và xóa file vật lý
     connection.query(
-      `INSERT INTO forms (title,description,category_id,template_html,created_by) VALUES (?,?,?,?,?)`,
-      [title, description, category_id, template_html, created_by],
+      `INSERT INTO forms (title, description, category_id, template_html, created_by, template_docx)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [title, description, category_id, template_html, created_by, uploadedFilename || null],
       (err2, result) => {
-        if (err2) return connection.rollback(() => { connection.release(); res.status(500).json({ error: err2.message }); });
+        if (err2) return connection.rollback(() => {
+          connection.release();
+          res.status(500).json({ error: err2.message });
+        });
+ 
         const formId = result.insertId;
         insertFields(formId, fields, connection, (err3) => {
-          if (err3) return connection.rollback(() => { connection.release(); res.status(500).json({ error: err3.message }); });
+          if (err3) return connection.rollback(() => {
+            connection.release();
+            res.status(500).json({ error: err3.message });
+          });
           connection.commit((err4) => {
             connection.release();
             if (err4) return res.status(500).json({ error: err4.message });
-            res.json({ message: "Tải lên thành công", form_id: formId, fields_detected: fields.length });
+            res.json({
+              message: "Tải lên thành công",
+              form_id: formId,
+              fields_detected: fields.length,
+            });
           });
         });
       }
@@ -720,23 +735,22 @@ exports.createFormPDF = async (req, res) => {
   const { title, description, category_id, created_by } = req.body;
   const file = req.file;
   if (!file) return res.status(400).json({ error: "Vui lòng tải lên file." });
-
+ 
   const filePath = path.resolve("uploads", file.filename);
   const ext = path.extname(file.originalname).toLowerCase();
-
-  // Timeout toàn bộ request: 90 giây
+ 
   const timeoutId = setTimeout(() => {
     if (!res.headersSent) {
       res.status(504).json({ error: "Xử lý quá lâu (>90s). Thử lại hoặc dùng file nhỏ hơn." });
     }
   }, 90000);
-
+ 
   const done = () => clearTimeout(timeoutId);
-
+ 
   try {
     console.log(`📂 Bắt đầu xử lý: ${file.originalname} (${ext}), size: ${file.size} bytes`);
     const t0 = Date.now();
-
+ 
     let rawHtml = "";
     if (ext === ".pdf") {
       console.log("📄 PDF: extract text...");
@@ -750,27 +764,32 @@ exports.createFormPDF = async (req, res) => {
       console.log("📝 DOC: LibreOffice → DOCX...");
       const docxPath = await convertDocToDocx(filePath);
       console.log(`  LibreOffice xong: ${Date.now() - t0}ms`);
-      console.log(`  DOCX path: ${docxPath}, exists: ${fs.existsSync(docxPath)}, size: ${fs.statSync(docxPath).size} bytes`);
       rawHtml = await convertDocxToHtml(docxPath);
       console.log(`✅ DOC xong: ${Date.now() - t0}ms`);
-      // Dọn file tạm
       try { fs.unlinkSync(docxPath); } catch {}
     } else {
       done();
       return res.status(400).json({ error: "Chỉ hỗ trợ .pdf, .docx, .doc" });
     }
-
+ 
     console.log("🔧 Inject input fields...");
     const { html, fields } = injectInputFields(rawHtml);
     console.log(`  Fields detected: ${fields.length}, HTML size: ${html.length} chars`);
-
-    // Override res.json để clear timeout khi response gửi xong
+ 
     const originalJson = res.json.bind(res);
     res.json = (data) => { done(); return originalJson(data); };
-
+ 
     saveFormToDB(
-      { title: title || "Biểu mẫu", description: description || "", category_id: category_id || null, template_html: wrapHtml(html), created_by: created_by || null },
-      fields, res
+      {
+        title: title || "Biểu mẫu",
+        description: description || "",
+        category_id: category_id || null,
+        template_html: wrapHtml(html),
+        created_by: created_by || null,
+        uploadedFilename: file.filename,   // ← LƯU TÊN FILE ĐỂ XÓA SAU
+      },
+      fields,
+      res
     );
   } catch (error) {
     done();
@@ -880,24 +899,94 @@ exports.getForms = (req, res) => {
 // ================= 7. XÓA =================
 exports.deleteForm = (req, res) => {
   const { id } = req.params;
-  db.transaction((err, connection) => {
-    if (err) return res.status(500).json({ error: err.message });
-    connection.query("DELETE FROM form_submissions WHERE form_id=?", [id], (err1) => {
-      if (err1) return connection.rollback(() => { connection.release(); res.status(500).json({ error: err1.message }); });
-      connection.query("DELETE FROM form_fields WHERE form_id=?", [id], (err2) => {
-        if (err2) return connection.rollback(() => { connection.release(); res.status(500).json({ error: err2.message }); });
-        connection.query("DELETE FROM forms WHERE form_id=?", [id], (err3) => {
-          if (err3) return connection.rollback(() => { connection.release(); res.status(500).json({ error: err3.message }); });
-          connection.commit((err4) => {
-            connection.release();
-            if (err4) return res.status(500).json({ error: err4.message });
-            res.json({ message: "Xóa thành công" });
+ 
+  // B1: Lấy tên file đã lưu trong DB trước khi xóa
+  db.query(
+    "SELECT template_docx, template_pdf FROM forms WHERE form_id = ?",
+    [id],
+    (errGet, rows) => {
+      if (errGet) return res.status(500).json({ error: errGet.message });
+      if (!rows.length) return res.status(404).json({ error: "Không tìm thấy biểu mẫu" });
+ 
+      const form = rows[0];
+      // Cả 2 cột đều có thể chứa tên file multer
+      const filesToDelete = [form.template_docx, form.template_pdf].filter(Boolean);
+ 
+      console.log(`🗑️ Chuẩn bị xóa form ${id}, files:`, filesToDelete);
+ 
+      // B2: Xóa DB theo thứ tự FK
+      db.transaction((err, connection) => {
+        if (err) return res.status(500).json({ error: err.message });
+ 
+        const steps = [
+          `DELETE FROM submission_view_history WHERE submission_id IN (SELECT submission_id FROM form_submissions WHERE form_id = ${connection.escape(id)})`,
+          `DELETE FROM submission_data WHERE submission_id IN (SELECT submission_id FROM form_submissions WHERE form_id = ${connection.escape(id)})`,
+          `DELETE FROM user_form_interactions WHERE form_id = ${connection.escape(id)}`,
+          `DELETE FROM form_submissions WHERE form_id = ${connection.escape(id)}`,
+          `DELETE FROM form_fields WHERE form_id = ${connection.escape(id)}`,
+          `DELETE FROM forms WHERE form_id = ${connection.escape(id)}`,
+        ];
+ 
+        const runStep = (index) => {
+          if (index >= steps.length) {
+            // Tất cả xóa xong → commit
+            connection.commit((errC) => {
+              connection.release();
+              if (errC) return res.status(500).json({ error: errC.message });
+ 
+              // B3: Xóa file vật lý
+              if (filesToDelete.length === 0) {
+                console.log("ℹ️ Không có file vật lý cần xóa.");
+                return res.json({ message: "Xóa thành công" });
+              }
+ 
+              filesToDelete.forEach((filename) => {
+                // Thử cả 2 cách resolve path
+                const filePath1 = path.resolve("uploads", filename);
+                const filePath2 = path.join(__dirname, "..", "uploads", filename);
+ 
+                console.log(`xóa: ${filePath1}`);
+ 
+                fs.unlink(filePath1, (err1) => {
+                  if (!err1) {
+                    console.log(`✅ Đã xóa file: ${filePath1}`);
+                  } else if (err1.code === "ENOENT") {
+                    // Thử path thứ 2
+                    fs.unlink(filePath2, (err2) => {
+                      if (!err2) {
+                        console.log(`✅ Đã xóa file (path2): ${filePath2}`);
+                      } else {
+                        console.warn(`⚠️ Không tìm thấy file để xóa: ${filename}`);
+                      }
+                    });
+                  } else {
+                    console.warn(`⚠️ Lỗi xóa file ${filename}:`, err1.message);
+                  }
+                });
+              });
+ 
+              res.json({ message: "Xóa thành công" });
+            });
+            return;
+          }
+ 
+          connection.query(steps[index], (errQ) => {
+            if (errQ) {
+              return connection.rollback(() => {
+                connection.release();
+                res.status(500).json({ error: `Bước ${index + 1}: ${errQ.message}` });
+              });
+            }
+            runStep(index + 1);
           });
-        });
+        };
+ 
+        runStep(0);
       });
-    });
-  });
+    }
+  );
 };
+ 
 
 // ================= 8. CATEGORIES =================
 exports.getCategories = (req, res) => {
