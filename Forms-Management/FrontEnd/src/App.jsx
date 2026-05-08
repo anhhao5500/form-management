@@ -47,10 +47,10 @@ export default function App() {
         <Route path="/profile/:id" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
 
-      
+
         <Route path="/submissions/:id" element={<ProtectedRoute><SubmissionDetail /></ProtectedRoute>} />
 
-       
+
 
         {/* ── Admin ── */}
         <Route path="/admin" element={
@@ -63,10 +63,10 @@ export default function App() {
           <ProtectedRoute adminOnly={true}><AdminLayout><AdminSubmissions /></AdminLayout></ProtectedRoute>
         } />
         <Route path="/admin/create" element={
-          <ProtectedRoute adminOnly={true}><AdminLayout><FormEditor /></AdminLayout></ProtectedRoute>
+          <ProtectedRoute adminOnly={true}><FormEditor /></ProtectedRoute>
         } />
         <Route path="/admin/edit/:id" element={
-          <ProtectedRoute adminOnly={true}><AdminLayout><FormEditor /></AdminLayout></ProtectedRoute>
+          <ProtectedRoute adminOnly={true}><FormEditor /></ProtectedRoute>
         } />
         <Route path="/admin/config-pdf/:id" element={
           <ProtectedRoute adminOnly={true}><AdminLayout><AdminPDFConfig /></AdminLayout></ProtectedRoute>
